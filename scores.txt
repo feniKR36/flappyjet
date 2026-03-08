@@ -1,0 +1,11 @@
+test,4
+test2,25
+jeditest,0
+jeditest2,0
+jeditest3,19
+jedi,9
+plswork,11
+itshouldwork,18
+h,5
+hel,6
+ok,1
