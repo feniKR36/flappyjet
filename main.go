@@ -387,7 +387,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			}
 			if coinImage != nil {
 				op := &ebiten.DrawImageOptions{}
-				op.GeoM.Scale(10/float64(coinImage.Bounds().Dx()), 10/float64(coinImage.Bounds().Dy()))
+				op.GeoM.Scale(50/float64(coinImage.Bounds().Dx()), 50/float64(coinImage.Bounds().Dy()))
 				op.GeoM.Translate(c.x, c.y)
 				screen.DrawImage(coinImage, op)
 			} else {
