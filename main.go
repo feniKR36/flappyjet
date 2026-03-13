@@ -1,5 +1,4 @@
 package main
-
 import (
 	"bufio"
 	"fmt"
@@ -13,25 +12,22 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"golang.org/x/image/font/basicfont"
 )
-
 const (
-	screenW = 400
-	screenH = 600
-	jetX    = 60
-	jetSize = 40
-	gravity = 0.5
-	jump    = -9
-	towerW  = 70
-	gap     = 220
-	speed   = 3
-
+	screenW   = 400 
+	screenH   = 600
+	jetX      = 60
+	jetSize   = 40
+	gravity   = 0.5
+	jump      = -9
+	towerW    = 70
+	gap       = 220
+	speed     = 3
 	scoreFile = "scores.txt"
 )
 
@@ -55,7 +51,6 @@ type Coin struct {
 	x, y      float64
 	collected bool
 }
-
 type Game struct {
 	state     State
 	username  string
@@ -76,11 +71,14 @@ var skinPrices = map[string]int{
 	"Red Jet":    10,
 	"Yellow Jet": 20,
 }
+
 var (
-	bgImage    *ebiten.Image
-	jetImage   *ebiten.Image
-	towerImage *ebiten.Image
-	coinImage  *ebiten.Image
+	bgImage      *ebiten.Image
+	towerImage   *ebiten.Image
+	coinImage    *ebiten.Image
+	jetSkins     = map[string]*ebiten.Image{}
+	previewSkins = map[string]*ebiten.Image{}
+	jetImage     *ebiten.Image
 )
 
 func loadImage(path string) *ebiten.Image {
@@ -89,13 +87,21 @@ func loadImage(path string) *ebiten.Image {
 		return nil
 	}
 	defer f.Close()
-
 	img, _, err := image.Decode(f)
 	if err != nil {
 		return nil
 	}
 	return ebiten.NewImageFromImage(img)
 }
+
+func loadJetSkin(username string) *ebiten.Image { //preloaded para dli lag 
+	skin := selectedSkin[username]
+	if img, ok := jetSkins[skin]; ok && img != nil {
+		return img
+	}
+	return jetSkins["Default"]
+}
+
 func loadScores() map[string]int {
 	s := map[string]int{}
 	f, err := os.Open(scoreFile)
@@ -103,7 +109,6 @@ func loadScores() map[string]int {
 		return s
 	}
 	defer f.Close()
-
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		p := strings.Split(sc.Text(), ",")
@@ -114,14 +119,15 @@ func loadScores() map[string]int {
 	}
 	return s
 }
+
 func saveScores(m map[string]int) {
 	f, _ := os.Create(scoreFile)
 	defer f.Close()
-
 	for k, v := range m {
 		fmt.Fprintf(f, "%s,%d\n", k, v)
 	}
 }
+
 func updateScore(user string, score int) {
 	s := loadScores()
 	if score > s[user] {
@@ -129,6 +135,7 @@ func updateScore(user string, score int) {
 	}
 	saveScores(s)
 }
+
 func leaderboard() []struct {
 	name  string
 	score int
@@ -141,7 +148,7 @@ func leaderboard() []struct {
 	for k, v := range loadScores() {
 		list = append(list, pair{k, v})
 	}
-	sort.Slice(list, func(i, j int) bool {
+	sort.SliceStable(list, func(i, j int) bool {
 		return list[i].score > list[j].score
 	})
 	var out []struct {
@@ -156,10 +163,12 @@ func leaderboard() []struct {
 	}
 	return out
 }
+
 func newTower() Tower {
 	h := rand.Float64()*(screenH-gap-100) + 50
 	return Tower{screenW, h, false}
 }
+
 func (g *Game) reset() {
 	g.jetY = screenH / 2
 	g.vel = 0
@@ -176,8 +185,10 @@ func (g *Game) reset() {
 	if selectedSkin[g.username] == "" {
 		selectedSkin[g.username] = "Default"
 	}
+	jetImage = loadJetSkin(g.username)
 	g.menuIndex = 0
 }
+
 func (g *Game) Update() error {
 	switch g.state {
 	case Login:
@@ -194,6 +205,7 @@ func (g *Game) Update() error {
 			g.state = Menu
 			g.menuIndex = 0
 		}
+
 	case Menu:
 		opts := []string{"Play", "Leaderboard", "Profile", "Shop", "Quit"}
 		if inpututil.IsKeyJustPressed(ebiten.KeyUp) {
@@ -226,15 +238,18 @@ func (g *Game) Update() error {
 				os.Exit(0)
 			}
 		}
+
 	case Gameplay:
 		if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 			g.vel = jump
 		}
 		g.vel += gravity
 		g.jetY += g.vel
+
 		if len(g.towers) == 0 || g.towers[len(g.towers)-1].x < screenW-200 {
 			g.towers = append(g.towers, newTower())
 		}
+
 		for i := range g.towers {
 			g.towers[i].x -= speed
 			if !g.towers[i].scored && g.towers[i].x+towerW < jetX {
@@ -242,13 +257,11 @@ func (g *Game) Update() error {
 				g.towers[i].scored = true
 			}
 			if jetX+jetSize > g.towers[i].x &&
-				jetX < g.towers[i].x+towerW {
-				if g.jetY < g.towers[i].h ||
-					g.jetY+jetSize > g.towers[i].h+gap {
-					updateScore(g.username, g.score)
-					g.state = Menu
-					g.menuIndex = 0
-				}
+				jetX < g.towers[i].x+towerW &&
+				(g.jetY < g.towers[i].h || g.jetY+jetSize > g.towers[i].h+gap) {
+				updateScore(g.username, g.score)
+				g.state = Menu
+				g.menuIndex = 0
 			}
 		}
 		filter := g.towers[:0]
@@ -263,34 +276,32 @@ func (g *Game) Update() error {
 			y := rand.Float64()*(gap-40) + t.h + 20
 			g.coins = append(g.coins, Coin{screenW, y, false})
 		}
-		for i := range g.coins {
-			g.coins[i].x -= speed
-			if !g.coins[i].collected &&
-				g.coins[i].x < jetX+jetSize &&
-				g.coins[i].x+10 > jetX &&
-				g.coins[i].y > g.jetY &&
-				g.coins[i].y < g.jetY+jetSize {
-				playerCoins[g.username]++
-				g.coins[i].collected = true
-			}
-		}
 		cf := g.coins[:0]
-		for _, c := range g.coins {
+		for i := range g.coins {
+			c := &g.coins[i]
+			c.x -= speed
+			if !c.collected && c.x < jetX+jetSize && c.x+10 > jetX && c.y > g.jetY && c.y < g.jetY+jetSize {
+				playerCoins[g.username]++
+				c.collected = true
+			}
 			if !c.collected && c.x > -10 {
-				cf = append(cf, c)
+				cf = append(cf, *c)
 			}
 		}
 		g.coins = cf
+
 		if g.jetY < 0 || g.jetY > screenH {
 			updateScore(g.username, g.score)
 			g.state = Menu
 			g.menuIndex = 0
 		}
+
 	case Leaderboard, Profile:
 		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			g.state = Menu
 			g.menuIndex = 0
 		}
+
 	case Shop:
 		if inpututil.IsKeyJustPressed(ebiten.KeyUp) {
 			g.menuIndex--
@@ -326,6 +337,7 @@ func (g *Game) Update() error {
 				}
 				i++
 			}
+			jetImage = loadJetSkin(g.username)
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			g.state = Menu
@@ -334,23 +346,26 @@ func (g *Game) Update() error {
 	}
 	return nil
 }
-func (g *Game) Draw(screen *ebiten.Image) {
+
+func (g *Game) Draw(screen *ebiten.Image) { //looping. game
 	if bgImage != nil {
 		screen.DrawImage(bgImage, nil)
 	} else {
 		screen.Fill(color.RGBA{200, 220, 255, 255})
 	}
+
 	switch g.state {
 	case Login:
 		text.Draw(screen, "Enter Username", basicfont.Face7x13, 130, 260, color.Black)
 		text.Draw(screen, g.input, basicfont.Face7x13, 130, 290, color.Black)
+
 	case Menu:
 		opts := []string{"Play", "Leaderboard", "Profile", "Shop", "Quit"}
 		text.Draw(screen, "Welcome "+g.username, basicfont.Face7x13, 120, 120, color.Black)
 		for i, o := range opts {
-			c := color.Color(color.Black)
+			var c color.Color = color.Black
 			if i == g.menuIndex {
-				c = color.Color(color.RGBA{0, 200, 0, 255})
+				c = color.RGBA{0, 200, 0, 255}
 			}
 			text.Draw(screen, o, basicfont.Face7x13, 160, 220+i*40, c)
 		}
@@ -367,12 +382,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			hTop := t.h
 			hBottom := screenH - (t.h + gap)
 			if towerImage != nil {
-				op := &ebiten.DrawImageOptions{} //top tower
-				scaleY := hTop / float64(towerImage.Bounds().Dy())
-				op.GeoM.Scale(towerW/float64(towerImage.Bounds().Dx()), -scaleY)
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Scale(towerW/float64(towerImage.Bounds().Dx()), -hTop/float64(towerImage.Bounds().Dy()))
 				op.GeoM.Translate(t.x, hTop)
 				screen.DrawImage(towerImage, op)
-				op2 := &ebiten.DrawImageOptions{} //bottom tower
+
+				op2 := &ebiten.DrawImageOptions{}
 				op2.GeoM.Scale(towerW/float64(towerImage.Bounds().Dx()), hBottom/float64(towerImage.Bounds().Dy()))
 				op2.GeoM.Translate(t.x, t.h+gap)
 				screen.DrawImage(towerImage, op2)
@@ -397,28 +412,34 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		text.Draw(screen, fmt.Sprintf("Score:%d", g.score), basicfont.Face7x13, 10, 20, color.Black)
 		text.Draw(screen, fmt.Sprintf("Coins:%d", playerCoins[g.username]), basicfont.Face7x13, 10, 40, color.Black)
 		text.Draw(screen, fmt.Sprintf("Best:%d", g.best), basicfont.Face7x13, 300, 20, color.Black)
+
 	case Leaderboard:
 		text.Draw(screen, "Leaderboard", basicfont.Face7x13, 150, 50, color.Black)
 		leaders := leaderboard()
-		for i, p := range leaders {
-			if i >= 10 {
-				break
-			}
-			text.Draw(screen, fmt.Sprintf("%d. %s - %d", i+1, p.name, p.score), basicfont.Face7x13, 100, 100+i*20, color.Black)
+		maxEntries := len(leaders)
+		if maxEntries > 10 {
+			maxEntries = 10
 		}
-		text.Draw(screen, "Press ESC to go back", basicfont.Face7x13, 100, 500, color.Color(color.RGBA{100, 100, 100, 255}))
+		for i := 0; i < maxEntries; i++ {
+			p := leaders[i]
+			text.Draw(screen, fmt.Sprintf("%d. %s - %d", i+1, p.name, p.score),
+				basicfont.Face7x13, 100, 100+i*25, color.Black)
+		}
+		text.Draw(screen, "Press ESC to go back", basicfont.Face7x13, 100, 550, color.RGBA{100, 100, 100, 255})
+
 	case Profile:
 		text.Draw(screen, "Profile", basicfont.Face7x13, 150, 50, color.Black)
 		text.Draw(screen, fmt.Sprintf("Username: %s", g.username), basicfont.Face7x13, 100, 100, color.Black)
 		text.Draw(screen, fmt.Sprintf("Coins: %d", playerCoins[g.username]), basicfont.Face7x13, 100, 130, color.Black)
 		text.Draw(screen, fmt.Sprintf("Owned Skins: %v", ownedSkins[g.username]), basicfont.Face7x13, 100, 160, color.Black)
 		text.Draw(screen, fmt.Sprintf("Selected Skin: %s", selectedSkin[g.username]), basicfont.Face7x13, 100, 190, color.Black)
-		text.Draw(screen, "Press ESC to go back", basicfont.Face7x13, 100, 500, color.Color(color.RGBA{100, 100, 100, 255}))
+		text.Draw(screen, "Press ESC to go back", basicfont.Face7x13, 100, 500, color.RGBA{100, 100, 100, 255})
 	case Shop:
 		text.Draw(screen, "Shop", basicfont.Face7x13, 150, 50, color.Black)
 		y := 100
-		i := 0
-		for skin, price := range skinPrices {
+		skins := []string{"Red Jet", "Yellow Jet"}
+		for i, skin := range skins {
+			price := skinPrices[skin]
 			status := "Buy"
 			for _, s := range ownedSkins[g.username] {
 				if s == skin {
@@ -426,31 +447,41 @@ func (g *Game) Draw(screen *ebiten.Image) {
 					break
 				}
 			}
-			c := color.Color(color.Black)
+			var c color.Color = color.Black
 			if i == g.menuIndex {
-				c = color.Color(color.RGBA{0, 200, 0, 255})
+				c = color.RGBA{0, 200, 0, 255}
 			}
 			text.Draw(screen, fmt.Sprintf("%s - %d coins [%s]", skin, price, status), basicfont.Face7x13, 100, y, c)
-			y += 30
-			i++
+			if img, ok := previewSkins[skin]; ok && img != nil {
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Scale(30/float64(img.Bounds().Dx()), 30/float64(img.Bounds().Dy()))
+				op.GeoM.Translate(70, float64(y-20))
+				screen.DrawImage(img, op)
+			}
+			y += 40
 		}
-		text.Draw(screen, "ESC to go back", basicfont.Face7x13, 50, 500, color.Color(color.RGBA{100, 100, 100, 255}))
+		text.Draw(screen, "ESC to go back", basicfont.Face7x13, 50, 550, color.RGBA{100, 100, 100, 255})
 	}
 }
 func (g *Game) Layout(int, int) (int, int) {
 	return screenW, screenH
 }
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
+
 	bgImage = loadImage("background.png")
-	jetImage = loadImage("jet.png")
 	towerImage = loadImage("tower.png")
 	coinImage = loadImage("coin.png")
-	game := &Game{state: Login}
-	ebiten.SetWindowSize(screenW, screenH)
-	ebiten.SetWindowTitle("Ready Jet Go")
+	jetSkins["Default"] = loadImage("jet.png")
+	jetSkins["Red Jet"] = loadImage("red_jet.png")
+	jetSkins["Yellow Jet"] = loadImage("yellow_jet.png")
+	previewSkins["Red Jet"] = loadImage("red_jet.png")
+	previewSkins["Yellow Jet"] = loadImage("yellow_jet.png")
 
-	if err := ebiten.RunGame(game); err != nil {
+	ebiten.SetWindowSize(screenW, screenH)
+	ebiten.SetWindowTitle("Flappy Jet")
+	if err := ebiten.RunGame(&Game{state: Login}); err != nil {
 		panic(err)
 	}
 }
