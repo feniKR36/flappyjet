@@ -1,5 +1,4 @@
-#para ni sa updated code nga giduganagn na nakog substitute image kay wa pako kadrawing. 
-# gilahi nako kay mapunog error original basig di mabalik
+#FOR THE LOVE OF GOD DONT EDIT THIS ANYMORE COZ IT'S NOW WORKING.....ok?
 import pygame
 import random
 import os
@@ -9,29 +8,42 @@ screenwidth = 400
 screenheight = 600
 jetsize = 20
 towerwidth = 70
-towergap = 150
+towergap = 250
 jetspeed = 5
 gravity = 0.5
 jetstrength = -10
 fps = 60
 scorefile = "scores.txt"
+
+#coin system
+coin_radius = 10
+coin_color = (255,215,0)
+coin_value = 1
+skin_prices = {
+    "red Jet": 10,
+    "yellow Jet": 20
+}
+player_coins = {}
+player_skins = {}
+player_selected_skin = {} 
+
 defaultbg = (255,255,255)
 jetimage = (0,0,0)
 toowerimage = (0,200,0)
 screen = pygame.display.set_mode((screenwidth,screenheight))
-pygame.display.set_caption("Ready...Jet set go!")
+pygame.display.set_caption("Ready... jet set go!")
 clock = pygame.time.Clock()
 font = pygame.font.Font(None,36)
 
 def displayedtext(surface,text,font,color,outline_color,x,y): #forautoformat
     base = font.render(text,True,color)
     outline = font.render(text,True,outline_color)
-
     for dx in [-2,-1,0,1,2]:
         for dy in [-2,-1,0,1,2]:
             if dx != 0 or dy != 0:
                 surface.blit(outline,(x+dx,y+dy))
     surface.blit(base,(x,y))
+
 #ilisan pa nako ni ug image broski
 background_img = pygame.image.load("background.png")
 background_img = pygame.transform.scale(background_img,(screenwidth,screenheight))
@@ -41,6 +53,12 @@ jet_img = pygame.transform.scale(jet_img,(jetsize*2,jetsize*2))
 
 tower_img = pygame.image.load("tower.png")
 tower_img = pygame.transform.scale(tower_img,(towerwidth,screenheight))
+
+jet_skins = {
+    "Default": jet_img,
+    "red Jet": pygame.transform.scale(pygame.image.load("red_jet.png"),(jetsize*3,jetsize*3)),
+    "yellow Jet": pygame.transform.scale(pygame.image.load("yellow_jet.png"),(jetsize*3,jetsize*3))
+}
 
 def load_scores():#scorerecs
     scores = {}
@@ -71,7 +89,7 @@ def get_leaderboard():
     scores = load_scores()
     return sorted(scores.items(),key=lambda x:x[1],reverse=True)
 
-def login_screen():#logindeets i check if oky ba logic, d mugana
+def login_screen():
     username = ""
     while True:
         screen.blit(background_img,(0,0))
@@ -91,13 +109,12 @@ def login_screen():#logindeets i check if oky ba logic, d mugana
                     if len(username) < 12:
                         username += event.unicode
 
-def main_menu(username):#mainwindowmenu
-    options = ["Play","Leaderboard","Profile","Quit"]
+def main_menu(username):
+    options = ["Play","Leaderboard","Profile","Shop","Quit"]
     selected = 0
     while True:
         screen.blit(background_img,(0,0))
         displayedtext(screen,f"Welcome {username}",font,jetimage,(255,255,255),120,120)
-
         for i,option in enumerate(options):
             color = toowerimage if i == selected else jetimage
             displayedtext(screen,option,font,color,(255,255,255),150,220 + i*50)
@@ -116,13 +133,32 @@ def main_menu(username):#mainwindowmenu
 
 def profile_screen(username):#profiledeets
     best_score = get_player_best(username)
+    skins = player_skins.get(username,["Default"])
+    selected = 0
     while True:
         screen.blit(background_img,(0,0))
         displayedtext(screen,"Player Profile",font,jetimage,(255,255,255),120,150)
-        displayedtext(screen,f"Username: {username}",font,jetimage,(255,255,255),120,230)
-        displayedtext(screen,f"Best Score: {best_score}",font,jetimage,(255,255,255),120,270)
-        displayedtext(screen,"ESC to return",font,jetimage,(255,255,255),120,420)
+        displayedtext(screen,f"Username: {username}",font,jetimage,(255,255,255),80,230)
+        displayedtext(screen,f"Best Score: {best_score}",font,jetimage,(255,255,255),80,270)
+        displayedtext(screen,f"Coins: {player_coins.get(username,0)}",font,jetimage,(255,255,255),80,310)
+        displayedtext(screen,"ESC to return",font,jetimage,(255,255,255),80,450)
+        displayedtext(screen,"Select Skin:",font,jetimage,(255,255,255),80,350)
 
+        #para nis alignment sa skin display basin malibog ka
+        start_x = 150
+        start_y = 380
+        spacing_y = 60
+        start_x = 150
+        start_y = 380
+        spacing_x = jetsize*2 + 20
+
+        for i, skin in enumerate(skins):
+            img = jet_skins[skin]
+            x = start_x + i * spacing_x
+            screen.blit(img, (x, start_y))
+  
+            if i == selected:
+                pygame.draw.rect(screen, (255,0,0), (x-5, start_y-5, jetsize*2+10, jetsize*2+10), 2)
         pygame.display.flip()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -131,6 +167,51 @@ def profile_screen(username):#profiledeets
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     return
+                elif event.key == pygame.K_UP:
+                    selected = (selected -1)%len(skins)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected +1)%len(skins)
+                elif event.key == pygame.K_RETURN:
+                    player_selected_skin[username] = skins[selected]
+
+def skin_shop_screen(username):
+    coins = player_coins.get(username,0)
+    selected = 0
+    options = list(skin_prices.keys()) + ["Back"]
+    while True:
+        screen.blit(background_img,(0,0))
+        displayedtext(screen,"Skin Shop",font,jetimage,(255,255,255),140,100)
+        displayedtext(screen,f"Coins: {coins}",font,jetimage,(255,255,255),140,140)
+        for i, opt in enumerate(options):
+            color = toowerimage if i == selected else jetimage
+            if opt != "Back":
+                img = jet_skins[opt]
+                screen.blit(img, (80, 200 + i*60)) #200 kay y coordinates
+                displayedtext(screen, f"{opt} - {skin_prices[opt]} coins", font, color, (255,255,255), 150, 200 + i*60 + 10)
+            else:
+                back_y = 350
+                displayedtext(screen, opt, font, color, (255,255,255), 140, back_y)
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected-1)%len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected+1)%len(options)
+                elif event.key == pygame.K_RETURN:
+                    choice = options[selected]
+                    if choice == "Back":
+                        player_coins[username] = coins
+                        return
+                    price = skin_prices[choice]
+                    if coins >= price and choice not in player_skins.get(username,[]):
+                        coins -= price
+                        player_skins.setdefault(username,[]).append(choice)
+                        player_selected_skin[username] = choice
+
 #scorerecsdeets
 def scoreboard_screen():
     leaderboard = get_leaderboard()
@@ -165,8 +246,14 @@ def run_game(username):#game loop
     jet_yaxis = screenheight//2
     jet_velocity = 0
     towers = []
+    coins = []
     score = 0
     best_score = get_player_best(username)
+
+    player_coins.setdefault(username,0)
+    if username not in player_selected_skin:
+        player_selected_skin[username] = "Default"
+
     while True:
         screen.blit(background_img,(0,0))
         for event in pygame.event.get():
@@ -175,35 +262,65 @@ def run_game(username):#game loop
                 exit()
             if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 jet_velocity = jetstrength
+
         jet_velocity += gravity
         jet_yaxis += jet_velocity
+
         jet_rect = pygame.Rect(50,jet_yaxis,jetsize,jetsize)
-        screen.blit(jet_img,(50,jet_yaxis))
+        current_jet_img = jet_skins.get(player_selected_skin[username],jet_img)
+        screen.blit(current_jet_img,(50,jet_yaxis))
+
         if not towers or towers[-1]["x"] < screenwidth-200:
             towers.append(create_tower())
+        
+        if towers and random.randint(0,100) < 2:#coin between towers. to be updated
+            last_tower = towers[-1]
+            coin_y = random.randint(
+                last_tower["height"]+20,
+                last_tower["height"]+towergap-20
+            )
+            coins.append({"x":screenwidth,"y":coin_y,"collected":False})
+
         for tower in towers:
             tower["x"] -= jetspeed
             top_tower = pygame.Rect(tower["x"],0,towerwidth,tower["height"])
             bottom_tower = pygame.Rect(tower["x"],tower["height"]+towergap,towerwidth,screenheight)
+
             top_img = pygame.transform.scale(tower_img,(towerwidth,tower["height"]))
             top_img = pygame.transform.flip(top_img,False,True)
             screen.blit(top_img,(tower["x"],0))
+
             bottom_height = screenheight - (tower["height"] + towergap)
             bottom_img = pygame.transform.scale(tower_img,(towerwidth,bottom_height))
             screen.blit(bottom_img,(tower["x"],tower["height"]+towergap))
+
             if jet_rect.colliderect(top_tower) or jet_rect.colliderect(bottom_tower):
                 update_player_score(username,score)
                 return
+
             if tower["x"] + towerwidth < 50 and not tower["scored"]:
                 score += 1
                 tower["scored"] = True
+
+        for coin in coins:
+            coin["x"] -= jetspeed
+            pygame.draw.circle(screen,coin_color,(int(coin["x"]),int(coin["y"])),coin_radius)
+            coin_rect = pygame.Rect(coin["x"]-coin_radius,coin["y"]-coin_radius,coin_radius*2,coin_radius*2)
+            if jet_rect.colliderect(coin_rect) and not coin["collected"]:
+                player_coins[username] += coin_value
+                coin["collected"] = True
+
+        coins = [c for c in coins if not c["collected"] and c["x"] > -20]
+
         if towers and towers[0]["x"] < -towerwidth:
             towers.pop(0)
+
         if jet_yaxis < 0 or jet_yaxis > screenheight:
             update_player_score(username,score)
             return
 
         displayedtext(screen,f"Score: {score}",font,jetimage,(255,255,255),10,10)
+        displayedtext(screen,f"Coins: {player_coins[username]}",font,jetimage,(255,255,255),10,40)
         displayedtext(screen,f"Best: {best_score}",font,jetimage,(255,255,255),280,10)
 
         pygame.display.flip()
@@ -219,6 +336,8 @@ while True:
         scoreboard_screen()
     elif choice == "Profile":
         profile_screen(username)
+    elif choice == "Shop":
+        skin_shop_screen(username)
     elif choice == "Quit":
         pygame.quit()
         break
