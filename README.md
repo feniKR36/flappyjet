@@ -19,10 +19,7 @@
 
  P.S. The structure still needed to be updated coz it is chaotic though it works
 
-# Screenshots
-<img src="mainwindow.png" alt="Main Window Screenshot" width="1100" height="700" />
-<img src="ingamess.png" alt="In-game Screenshot" width="1100" height="700" />
-<img src="leaderboard.png" alt="Report Screenshot" width="1100" height="700" />
+
 
 ## How to run the program
 -Python Version:
