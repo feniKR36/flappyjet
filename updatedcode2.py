@@ -44,7 +44,6 @@ def displayedtext(surface,text,font,color,outline_color,x,y): #forautoformat
                 surface.blit(outline,(x+dx,y+dy))
     surface.blit(base,(x,y))
 
-#ilisan pa nako ni ug image broski
 background_img = pygame.image.load("background.png")
 background_img = pygame.transform.scale(background_img,(screenwidth,screenheight))
 
